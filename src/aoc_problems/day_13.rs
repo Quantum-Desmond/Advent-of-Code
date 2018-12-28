@@ -2,6 +2,8 @@ use std::io;
 use std::fs::File;
 use std::io::prelude::*;
 
+use std::collections::HashSet;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Direction {
     Up,
@@ -58,6 +60,7 @@ fn new_dir_from_old(dir: Direction, last_junction_dir: Direction) -> Direction {
 
 #[derive(Debug, Clone, Copy)]
 struct Cart {
+    id: usize,
     x: usize,
     y: usize,
     dir: Direction,
@@ -65,8 +68,9 @@ struct Cart {
 }
 
 impl Cart {
-    fn new(x: usize, y: usize, dir: Direction) -> Cart {
+    fn new(id: usize, x: usize, y: usize, dir: Direction) -> Cart {
         Cart {
+            id,
             x,
             y,
             dir,
@@ -164,7 +168,8 @@ pub fn q1(fname: String) -> (usize, usize) {
     let mut cart_list: Vec<Cart> = vec![];
     for y in 0..grid_size { for x in 0..grid_size {
         if let Some(dir) = char_to_dir(orig_char_grid[y][x]) {
-            cart_list.push(Cart::new(x, y, dir));
+            let id = cart_list.len();
+            cart_list.push(Cart::new(id, x, y, dir));
         }
     }}
 
@@ -219,58 +224,48 @@ pub fn q2(fname: String) -> (usize, usize) {
     let mut cart_list: Vec<Cart> = vec![];
     for y in 0..grid_size { for x in 0..grid_size {
         if let Some(dir) = char_to_dir(orig_char_grid[y][x]) {
-            cart_list.push(Cart::new(x, y, dir));
+            let id = cart_list.len();
+            cart_list.push(Cart::new(id, x, y, dir));
         }
     }}
 
     let mut new_char_grid = orig_char_grid.clone();
     let mut tick_count: usize = 0;
 
+    let mut broken_carts: HashSet<usize> = HashSet::new();
+
+
     loop {
-        if cart_list.len() == 1 {
-            println!("Tick count = {}", tick_count);
-            return (cart_list[0].x, cart_list[0].y);
-        }
-
-        let mut new_cart_list: Vec<Cart> = vec![];
-
         cart_list.sort_by_key(|cart| (cart.y, cart.x));
 
-        for c in cart_list.iter_mut() {
-            let mut cart = c.clone();
+        for c in cart_list.iter() {
+            let cart = c.clone();
+            if broken_carts.contains(&cart.id) {
+                continue;
+            }
             // move cart
             let orig_pos: (usize, usize) = (cart.x, cart.y);
             cart.x = (cart.x as i32 + x_change(&cart.dir)) as usize;
             cart.y = (cart.y as i32 + y_change(&cart.dir)) as usize;
 
+            cart.dir = match new_dir(&mut cart, &new_char_grid) {
+                Ok(dir) => dir,
+                Err(id) => {
+                    // add carts which are on dodgy space to broken_carts
+                    broken_carts.insert(cart.id);
+                    broken_carts.insert(id);
+
+                    println!("Tick count = {}", tick_count);
+                    continue;
+                }
+            };
+            new_char_grid[cart.y][cart.x] = dir_to_char(cart.dir);
             new_char_grid[orig_pos.1][orig_pos.0] = sanitise_track(
                 orig_char_grid[orig_pos.1][orig_pos.0]
             );
 
-            let new_dir_info = new_dir(&mut cart, &new_char_grid);
-            if let Err((x, y)) = new_dir_info {
-                // First, remove carts from track
-                new_char_grid[y][x] = sanitise_track(
-                    orig_char_grid[y][x]
-                );
-
-                new_cart_list.retain(|a| a.x != x || a.y != y);
-                continue;
-
-            }
-            cart.dir = new_dir_info.unwrap();
-            new_char_grid[cart.y][cart.x] = dir_to_char(cart.dir);
-
-            new_cart_list.push(cart);
         }
 
         tick_count += 1;
-
-        if tick_count > 10740 {
-            print_grid(&new_char_grid);
-            pause();
-        }
-
-        cart_list = new_cart_list;
     }
 }
