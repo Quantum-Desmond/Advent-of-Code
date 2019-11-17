@@ -33,6 +33,15 @@ enum Species {
     ELF
 }
 
+impl fmt::Display for Species {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Species::GOBLIN => write!(f, "Goblin"),
+            Species::ELF => write!(f, "Elf"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default, Eq, PartialEq, Hash)]
 struct Coordinate {
     x: usize,
@@ -192,6 +201,7 @@ impl Map {
         d.insert(start, 0);
 
         let mut queue: VecDeque<Coordinate> = VecDeque::new();
+        queue.push_front(start);
         let mut todo_set: BTreeSet<Coordinate> = BTreeSet::new();
         let mut visited: BTreeSet<Coordinate> = BTreeSet::new();
         while let Some(c) = queue.pop_front() {
@@ -255,14 +265,17 @@ impl Map {
             if !self.is_adjacent_to_target(current_coord, &targets) {
                 // it moves
                 let reachable_distances = self.distances_from(current_coord);
-                let chosen_coord = targets
+                let chosen_coord = adjacent_squares
                     .iter()
                     .filter_map(|target| reachable_distances.get(&target).map(|d| (target, d)))
                     .min_by_key(|&(_, d)| d)
                     .map(|(c, _)| c);
 
                 let chosen_coord = match chosen_coord {
-                    None => continue,
+                    None => {
+                        println!("No available coordinate to try and move to");
+                        continue
+                    },
                     Some(c) => c
                 };
 
@@ -274,10 +287,11 @@ impl Map {
                     .map(|(c, _)| c)
                     .unwrap();
 
-                if !self.characters.contains_key(&coord_to_move_to) {
-                    println!("baaaaaad");
-                    panic!();
-                }
+                println!(
+                    "{} is moving from {} to {}",
+                    self.characters.get(&current_coord).unwrap().species,
+                    current_coord,
+                    coord_to_move_to);
                 let character = self.characters.remove(&current_coord).unwrap();
                 self.characters.insert(coord_to_move_to, character);
 
@@ -306,6 +320,8 @@ impl Map {
             write!(io::stdout(), "{}", self).unwrap();
             panic!("More than one species left");
         }
+
+        println!("Total health for everyone: {:?}", self.characters.iter().map(|(k, v)| (k, v.health)).collect::<Vec<_>>());
 
         self.characters.values().map(|character| character.health).sum()
     }
@@ -362,11 +378,14 @@ fn _q1(input_grid: Vec<Vec<char>>) -> Result<usize> {
 
     const LIMIT: usize = 1000;
     for i in 0..LIMIT {
+        println!("After {} turns", i);
+        print!("{}", map);
         let run_again = map.increment();
         if !run_again {
             println!("Number of loops = {}", i);
             return Ok(i * map.total_health());
         }
+
     }
 
     return err!("Limit surpassed!");
