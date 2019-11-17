@@ -218,54 +218,6 @@ pub fn q2(fname: String) -> (usize, usize) {
         x.to_string()
     }).collect();
 
-    let orig_char_grid: Vec<Vec<char>> = text_lines.iter().map(|s| s.chars().collect::<Vec<char>>()).collect();
-    let grid_size: usize = 150;
+    unimplemented!();
 
-    let mut cart_list: Vec<Cart> = vec![];
-    for y in 0..grid_size { for x in 0..grid_size {
-        if let Some(dir) = char_to_dir(orig_char_grid[y][x]) {
-            let id = cart_list.len();
-            cart_list.push(Cart::new(id, x, y, dir));
-        }
-    }}
-
-    let mut new_char_grid = orig_char_grid.clone();
-    let mut tick_count: usize = 0;
-
-    let mut broken_carts: HashSet<usize> = HashSet::new();
-
-
-    loop {
-        cart_list.sort_by_key(|cart| (cart.y, cart.x));
-
-        for c in cart_list.iter() {
-            let cart = c.clone();
-            if broken_carts.contains(&cart.id) {
-                continue;
-            }
-            // move cart
-            let orig_pos: (usize, usize) = (cart.x, cart.y);
-            cart.x = (cart.x as i32 + x_change(&cart.dir)) as usize;
-            cart.y = (cart.y as i32 + y_change(&cart.dir)) as usize;
-
-            cart.dir = match new_dir(&mut cart, &new_char_grid) {
-                Ok(dir) => dir,
-                Err(id) => {
-                    // add carts which are on dodgy space to broken_carts
-                    broken_carts.insert(cart.id);
-                    broken_carts.insert(id);
-
-                    println!("Tick count = {}", tick_count);
-                    continue;
-                }
-            };
-            new_char_grid[cart.y][cart.x] = dir_to_char(cart.dir);
-            new_char_grid[orig_pos.1][orig_pos.0] = sanitise_track(
-                orig_char_grid[orig_pos.1][orig_pos.0]
-            );
-
-        }
-
-        tick_count += 1;
-    }
 }

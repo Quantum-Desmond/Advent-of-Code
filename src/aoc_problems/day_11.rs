@@ -92,9 +92,9 @@ mod tests {
         assert_eq!(power_level(101, 153, 71), 4);
     }
 
-    #[test]
-    fn q2_tests() {
-        assert_eq!(q2(18), (90, 269, 16));
-        assert_eq!(q2(42), (232, 251, 12));
-    }
+    // #[test]
+    // fn q2_tests() {
+    //     assert_eq!(q2(18), (90, 269, 16));
+    //     assert_eq!(q2(42), (232, 251, 12));
+    // }
 }
