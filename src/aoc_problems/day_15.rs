@@ -91,10 +91,10 @@ struct Character {
 }
 
 impl Character {
-    fn new(species: Species) -> Character {
+    fn new(species: Species, atk: usize) -> Character {
         Character {
             species,
-            health: 200, attack: 3}
+            health: 200, attack: atk}
     }
 
     fn take_damage(&mut self, atk: usize) -> bool {
@@ -146,24 +146,32 @@ impl FromStr for Cell {
 struct Map {
     grid: BTreeMap<Coordinate, Cell>,
     characters: BTreeMap<Coordinate, Character>,
-    max: Coordinate
+    max: Coordinate,
+    elf_atk: usize,
+    initial_elf_count: usize
 }
 
 impl Map {
     fn new(input_grid: Vec<Vec<char>>) -> Result<Map> {
+        Map::new_w_atk(input_grid, 3)
+    }
+
+    fn new_w_atk(input_grid: Vec<Vec<char>>, elf_atk: usize) -> Result<Map> {
         let mut map = Map::default();
         map.max = Coordinate { x: input_grid[0].len(), y: input_grid.len() };
+
+        let goblin_atk = 3;
 
         for y in 0..input_grid.len() {
             for x in 0..input_grid[y].len() {
                 let c = Coordinate { x, y };
                 match input_grid[y][x] {
                     'G' => {
-                        map.characters.insert(c, Character::new(Species::GOBLIN));
+                        map.characters.insert(c, Character::new(Species::GOBLIN, goblin_atk));
                         map.grid.insert(c, Cell::Open);
                     },
                     'E' => {
-                        map.characters.insert(c, Character::new(Species::ELF));
+                        map.characters.insert(c, Character::new(Species::ELF, elf_atk));
                         map.grid.insert(c, Cell::Open);
                     },
                     cell => {
@@ -172,7 +180,39 @@ impl Map {
                 }
             }
         }
+
+        map.initial_elf_count = map.characters.values().filter(|c| c.species == Species::ELF).count();
+        map.elf_atk = elf_atk;
+        println!("Elf attack = {}", elf_atk);
+
         Ok(map)
+    }
+
+    fn outcome(&mut self) -> Result<usize> {
+        const LIMIT: usize = 1000;
+        for i in 0..LIMIT {
+            let run_again = self.increment();
+            if !run_again {
+                println!("Number of loops = {}", i);
+                return Ok(i * self.total_health());
+            }
+
+        }
+
+        return err!("Limit surpassed!");
+    }
+
+    fn any_elves_lost(&self) -> bool {
+        self.initial_elf_count != self.characters.values().filter(|c| c.species == Species::ELF).count()
+    }
+
+    fn elfy_outcome(&mut self) -> Option<usize> {
+        let outcome = self.outcome();
+
+        match self.any_elves_lost() {
+            true => None,
+            false => outcome.ok()
+        }
     }
 
     fn possible_targets(&self, c: Coordinate) -> Vec<Coordinate> {
@@ -231,11 +271,19 @@ impl Map {
     }
 
     fn next_target(&self, coord: Coordinate) -> Option<Coordinate> {
-        coord.surrounding_squares().into_iter().filter(|c| {
-            self.grid.get(&c).unwrap().is_open()
-                && self.characters.contains_key(&c)
-                && self.characters.get(&c).unwrap().species != self.characters.get(&coord).unwrap().species
-        }).min_by_key(|&c| self.characters.get(&c).unwrap().health)
+        let mut possible_targets: Vec<_> = coord
+            .surrounding_squares()
+            .into_iter()
+            .filter(|c| {
+                self.grid.get(&c).unwrap().is_open()
+                    && self.characters.contains_key(&c)
+                    && self.characters.get(&c).unwrap().species != self.characters.get(&coord).unwrap().species
+            })
+            .collect();
+
+        possible_targets.sort();
+
+        possible_targets.into_iter().min_by_key(|&c| self.characters.get(&c).unwrap().health)
     }
 
     fn attack(&mut self, attacker: Coordinate, target: Coordinate) {
@@ -385,17 +433,29 @@ fn _q1(input_grid: Vec<Vec<char>>) -> Result<usize> {
         );
     }
 
-    const LIMIT: usize = 1000;
-    for i in 0..LIMIT {
-        // println!("After {} turns:", i);
-        // print!("{}", map);
-        // pause();
-        let run_again = map.increment();
-        if !run_again {
-            println!("Number of loops = {}", i);
-            return Ok(i * map.total_health());
-        }
+    map.outcome()
+}
 
+pub fn q2(fname: String) -> usize {
+    let mut f = File::open(fname).expect("File not found");
+    let mut f_contents = String::new();
+
+    f.read_to_string(&mut f_contents).expect("Couldn't find file");
+    let map: Vec<Vec<char>> = f_contents.lines().map(|x: &str| {
+        x.to_string().chars().collect::<Vec<char>>()
+    }).collect();
+
+    _q2(map).unwrap()
+}
+
+fn _q2(input_grid: Vec<Vec<char>>) -> Result<usize> {
+    for elf_atk in 4..100 {
+        match Map::new_w_atk(input_grid.clone(), elf_atk).unwrap().elfy_outcome() {
+            Some(outcome) => {
+               return Ok(outcome)
+            },
+            None => continue
+        }
     }
 
     return err!("Limit surpassed!");
@@ -500,6 +560,88 @@ mod tests {
                 vec!['#', '#', '#', '#', '#', '#', '#'],
             ]).unwrap(),
             27730
+        );
+    }
+
+    #[test]
+    fn q2_test1() {
+        assert_eq!(
+            _q2(vec![
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+                vec!['#', '.', 'G', '.', '.', '.', '#'],
+                vec!['#', '.', '.', '.', 'E', 'G', '#'],
+                vec!['#', '.', '#', '.', '#', 'G', '#'],
+                vec!['#', '.', '.', 'G', '#', 'E', '#'],
+                vec!['#', '.', '.', '.', '.', '.', '#'],
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+            ]).unwrap(),
+            4988
+        );
+    }
+
+    #[test]
+    fn q2_test2() {
+        assert_eq!(
+            _q2(vec![
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+                vec!['#', 'E', '.', '.', 'E', 'G', '#'],
+                vec!['#', '.', '#', 'G', '.', 'E', '#'],
+                vec!['#', 'E', '.', '#', '#', 'E', '#'],
+                vec!['#', 'G', '.', '.', '#', '.', '#'],
+                vec!['#', '.', '.', 'E', '#', '.', '#'],
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+            ]).unwrap(),
+            31284
+        );
+    }
+
+    #[test]
+    fn q2_test3() {
+        assert_eq!(
+            _q2(vec![
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+                vec!['#', 'E', '.', 'G', '#', '.', '#'],
+                vec!['#', '.', '#', 'G', '.', '.', '#'],
+                vec!['#', 'G', '.', '#', '.', 'G', '#'],
+                vec!['#', 'G', '.', '.', '#', '.', '#'],
+                vec!['#', '.', '.', '.', 'E', '.', '#'],
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+            ]).unwrap(),
+            3478
+        );
+    }
+
+    #[test]
+    fn q2_test4() {
+        assert_eq!(
+            _q2(vec![
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+                vec!['#', '.', 'E', '.', '.', '.', '#'],
+                vec!['#', '.', '#', '.', '.', 'G', '#'],
+                vec!['#', '.', '#', '#', '#', '.', '#'],
+                vec!['#', 'E', '#', 'G', '#', 'G', '#'],
+                vec!['#', '.', '.', '.', '#', 'G', '#'],
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+            ]).unwrap(),
+            6474
+        );
+    }
+
+    #[test]
+    fn q2_test5() {
+        assert_eq!(
+            _q2(vec![
+                vec!['#', '#', '#', '#', '#', '#', '#', '#', '#'],
+                vec!['#', 'G', '.', '.', '.', '.', '.', '.', '#'],
+                vec!['#', '.', 'E', '.', '#', '.', '.', '.', '#'],
+                vec!['#', '.', '.', '#', '#', '.', '.', 'G', '#'],
+                vec!['#', '.', '.', '.', '#', '#', '.', '.', '#'],
+                vec!['#', '.', '.', '.', '#', '.', '.', '.', '#'],
+                vec!['#', '.', 'G', '.', '.', '.', 'G', '.', '#'],
+                vec!['#', '.', '.', '.', '.', '.', 'G', '.', '#'],
+                vec!['#', '#', '#', '#', '#', '#', '#', '#', '#'],
+            ]).unwrap(),
+            1140
         );
     }
 }
