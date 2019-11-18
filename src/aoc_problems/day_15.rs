@@ -51,9 +51,9 @@ struct Coordinate {
 impl Coordinate {
     fn surrounding_squares(self: Coordinate) -> Vec<Coordinate> {
         vec![
+            Coordinate { y: self.y - 1, ..self },
             Coordinate { x: self.x - 1, ..self },
             Coordinate { x: self.x + 1, ..self },
-            Coordinate { y: self.y - 1, ..self },
             Coordinate { y: self.y + 1, ..self },
         ]
     }
