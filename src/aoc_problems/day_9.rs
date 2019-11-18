@@ -23,7 +23,7 @@ pub fn q1(player_num: u32, last_marble_pt: u32) -> u32 {
                 // }
 
                 let modulo = marble_circle.len();
-                let mut new_marble_idx = (current_marble_idx + modulo - 7) % modulo;
+                let new_marble_idx = (current_marble_idx + modulo - 7) % modulo;
                 let removed_marble: u32 = marble_circle.remove(new_marble_idx).unwrap();
                 // if cfg!(debug_assertions) {
                 //     println!(

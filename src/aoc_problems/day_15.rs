@@ -177,7 +177,11 @@ impl Map {
 
     fn possible_targets(&self, c: Coordinate) -> Vec<Coordinate> {
         let current_species: Species = self.characters.get(&c).unwrap().species;
-        self.characters.keys().cloned().filter(|coord| self.characters.get(&coord).unwrap().species != current_species).collect()
+        self.characters
+            .keys()
+            .cloned()
+            .filter(|coord| self.characters.get(&coord).unwrap().species != current_species)
+            .collect()
     }
 
     fn free_squares_around(&self, target: Coordinate) -> Vec<Coordinate> {
@@ -265,33 +269,38 @@ impl Map {
             if !self.is_adjacent_to_target(current_coord, &targets) {
                 // it moves
                 let reachable_distances = self.distances_from(current_coord);
-                let chosen_coord = adjacent_squares
+
+                let mut ordered_dists: Vec<_> = adjacent_squares
                     .iter()
                     .filter_map(|target| reachable_distances.get(&target).map(|d| (target, d)))
+                    .collect();
+                ordered_dists.sort_by_key(|&(c, _)| c);
+
+                let chosen_coord = ordered_dists
+                    .into_iter()
                     .min_by_key(|&(_, d)| d)
                     .map(|(c, _)| c);
 
                 let chosen_coord = match chosen_coord {
                     None => {
-                        println!("No available coordinate to try and move to");
                         continue
                     },
                     Some(c) => c
                 };
 
                 let dists_from_target = self.distances_from(*chosen_coord);
-                let coord_to_move_to = self.free_squares_around(current_coord)
+                let mut ordered_dists_to_move_to: Vec<_> = self.free_squares_around(current_coord)
                     .into_iter()
                     .filter_map(|target| dists_from_target.get(&target).map(|d| (target, d)))
+                    .collect();
+                ordered_dists_to_move_to.sort_by_key(|&(c, _)| c);
+
+                let coord_to_move_to = ordered_dists_to_move_to
+                    .into_iter()
                     .min_by_key(|&(_, d)| d)
                     .map(|(c, _)| c)
                     .unwrap();
 
-                println!(
-                    "{} is moving from {} to {}",
-                    self.characters.get(&current_coord).unwrap().species,
-                    current_coord,
-                    coord_to_move_to);
                 let character = self.characters.remove(&current_coord).unwrap();
                 self.characters.insert(coord_to_move_to, character);
 
@@ -378,8 +387,9 @@ fn _q1(input_grid: Vec<Vec<char>>) -> Result<usize> {
 
     const LIMIT: usize = 1000;
     for i in 0..LIMIT {
-        println!("After {} turns", i);
-        print!("{}", map);
+        // println!("After {} turns:", i);
+        // print!("{}", map);
+        // pause();
         let run_again = map.increment();
         if !run_again {
             println!("Number of loops = {}", i);
@@ -410,6 +420,7 @@ mod tests {
             36334
         );
     }
+
     #[test]
     fn q1_test2() {
         assert_eq!(
@@ -425,6 +436,7 @@ mod tests {
             39514
         );
     }
+
     #[test]
     fn q1_test3() {
         assert_eq!(
@@ -440,6 +452,7 @@ mod tests {
             27755
         );
     }
+
     #[test]
     fn q1_test4() {
         assert_eq!(
@@ -455,6 +468,7 @@ mod tests {
             28944
         );
     }
+
     #[test]
     fn q1_test5() {
         assert_eq!(
@@ -470,6 +484,22 @@ mod tests {
                 vec!['#', '#', '#', '#', '#', '#', '#', '#', '#'],
             ]).unwrap(),
             18740
+        );
+    }
+
+    #[test]
+    fn q1_test6() {
+        assert_eq!(
+            _q1(vec![
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+                vec!['#', '.', 'G', '.', '.', '.', '#'],
+                vec!['#', '.', '.', '.', 'E', 'G', '#'],
+                vec!['#', '.', '#', '.', '#', 'G', '#'],
+                vec!['#', '.', '.', 'G', '#', 'E', '#'],
+                vec!['#', '.', '.', '.', '.', '.', '#'],
+                vec!['#', '#', '#', '#', '#', '#', '#'],
+            ]).unwrap(),
+            27730
         );
     }
 }

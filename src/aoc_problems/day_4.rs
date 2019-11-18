@@ -56,7 +56,7 @@ pub fn q1(fname: String) -> u32 {
                 start_minute = claim.dt.minute();
             },
             "wakes up" => {
-                let mut minute_list = asleep_times.entry(guard_id).or_insert(vec![]);
+                let minute_list = asleep_times.entry(guard_id).or_insert(vec![]);
                 for t in start_minute..claim.dt.minute() {
                     minute_list.push(t);
                 }
@@ -115,7 +115,7 @@ pub fn q2(fname: String) -> u32 {
                 start_minute = claim.dt.minute();
             },
             "wakes up" => {
-                let mut minute_list = asleep_times.entry(guard_id).or_insert(vec![]);
+                let minute_list = asleep_times.entry(guard_id).or_insert(vec![]);
                 for t in start_minute..claim.dt.minute() {
                     minute_list.push(t);
                 }

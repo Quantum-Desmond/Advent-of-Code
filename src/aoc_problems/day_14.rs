@@ -1,9 +1,5 @@
-use std::cmp;
 use std::io;
-use std::fs::File;
 use std::io::prelude::*;
-
-use std::collections::HashSet;
 
 fn pause() {
     let mut stdin = io::stdin();

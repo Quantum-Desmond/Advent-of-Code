@@ -2,8 +2,6 @@ use std::io;
 use std::fs::File;
 use std::io::prelude::*;
 
-use std::collections::HashSet;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Direction {
     Up,
@@ -214,9 +212,9 @@ pub fn q2(fname: String) -> (usize, usize) {
     let mut f_contents = String::new();
 
     f.read_to_string(&mut f_contents).expect("Couldn't find file");
-    let text_lines: Vec<_> = f_contents.lines().map(|x: &str| {
-        x.to_string()
-    }).collect();
+    // let text_lines: Vec<_> = f_contents.lines().map(|x: &str| {
+    //     x.to_string()
+    // }).collect();
 
     unimplemented!();
 
