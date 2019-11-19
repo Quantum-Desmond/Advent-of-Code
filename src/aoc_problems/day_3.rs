@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
-extern crate regex;
-use self::regex::Regex;
+use regex::Regex;
 
 #[derive(Debug)]
 struct Claim {

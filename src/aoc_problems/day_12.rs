@@ -4,8 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
-extern crate regex;
-use self::regex::Regex;
+use regex::Regex;
 
 fn char_to_bool(c: char) -> bool {
     match c {

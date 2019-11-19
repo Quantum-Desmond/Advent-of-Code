@@ -4,8 +4,7 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 
-extern crate regex;
-use self::regex::Regex;
+use regex::Regex;
 
 #[derive(Debug)]
 pub struct Order {
