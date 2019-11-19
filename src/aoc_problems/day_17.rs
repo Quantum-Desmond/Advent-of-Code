@@ -33,21 +33,6 @@ fn pause() {
     let _ = stdin.read(&mut [0u8]).unwrap();
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-enum Species {
-    GOBLIN,
-    ELF
-}
-
-impl fmt::Display for Species {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Species::GOBLIN => write!(f, "Goblin"),
-            Species::ELF => write!(f, "Elf"),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Default, Eq, PartialEq, Hash)]
 struct Coordinate {
     x: usize,
@@ -62,6 +47,24 @@ impl Coordinate {
             Coordinate { x: self.x + 1, ..self },
             Coordinate { y: self.y + 1, ..self },
         ]
+    }
+
+    fn square_below(self) -> Coordinate {
+        Coordinate { y: self.y + 1, ..self }
+    }
+
+    fn adjacent_squares(self) -> Vec<Coordinate> {
+        vec![
+            Coordinate { x: self.x - 1, ..self },
+            Coordinate { x: self.x + 1, ..self },
+        ]
+    }
+
+    fn square_to_the(self, direction: Direction) -> Coordinate {
+        match direction {
+            Direction::Left => Coordinate { x: self.x - 1, ..self },
+            Direction::Right => Coordinate { x: self.x + 1, ..self },
+        }
     }
 }
 
@@ -89,330 +92,13 @@ impl fmt::Display for Coordinate {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-struct Character {
-    species: Species,
-    health: usize,
-    attack: usize
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+enum Direction {
+    Left,
+    Right,
 }
 
-impl Character {
-    fn new(species: Species, atk: usize) -> Character {
-        Character {
-            species,
-            health: 200, attack: atk}
-    }
-
-    fn take_damage(&mut self, atk: usize) -> bool {
-        if atk >= self.health {
-            return true;
-        }
-
-        self.health -= atk;
-
-        return false;
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Cell {
-    Open,
-    Wall
-}
-
-impl Cell {
-    fn is_open(self) -> bool {
-        self == Cell::Open
-    }
-}
-
-impl fmt::Display for Cell {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Cell::Open => write!(f, "."),
-            Cell::Wall => write!(f, "#"),
-        }
-    }
-}
-
-impl FromStr for Cell {
-    type Err = Box<dyn Error>;
-
-    fn from_str(s: &str) -> Result<Cell> {
-        match s.as_bytes().get(0) {
-            None => err!("empty string doesn't work"),
-            Some(&b'.') => Ok(Cell::Open),
-            Some(&b'#') => Ok(Cell::Wall),
-            Some(&b) => err!("Cannot read: 0x{:X}", b),
-        }
-    }
-}
-
-#[derive(Default)]
-struct Map {
-    grid: BTreeMap<Coordinate, Cell>,
-    characters: BTreeMap<Coordinate, Character>,
-    max: Coordinate,
-    elf_atk: usize,
-    initial_elf_count: usize
-}
-
-impl Map {
-    fn new(input_grid: Vec<Vec<char>>) -> Result<Map> {
-        Map::new_w_atk(input_grid, 3)
-    }
-
-    fn new_w_atk(input_grid: Vec<Vec<char>>, elf_atk: usize) -> Result<Map> {
-        let mut map = Map::default();
-        map.max = Coordinate { x: input_grid[0].len(), y: input_grid.len() };
-
-        let goblin_atk = 3;
-
-        for y in 0..input_grid.len() {
-            for x in 0..input_grid[y].len() {
-                let c = Coordinate { x, y };
-                match input_grid[y][x] {
-                    'G' => {
-                        map.characters.insert(c, Character::new(Species::GOBLIN, goblin_atk));
-                        map.grid.insert(c, Cell::Open);
-                    },
-                    'E' => {
-                        map.characters.insert(c, Character::new(Species::ELF, elf_atk));
-                        map.grid.insert(c, Cell::Open);
-                    },
-                    cell => {
-                        map.grid.insert(c, cell.to_string().parse()?);
-                    }
-                }
-            }
-        }
-
-        map.initial_elf_count = map.characters.values().filter(|c| c.species == Species::ELF).count();
-        map.elf_atk = elf_atk;
-        println!("Elf attack = {}", elf_atk);
-
-        Ok(map)
-    }
-
-    fn outcome(&mut self) -> Result<usize> {
-        const LIMIT: usize = 1000;
-        for i in 0..LIMIT {
-            let run_again = self.increment();
-            if !run_again {
-                println!("Number of loops = {}", i);
-                return Ok(i * self.total_health());
-            }
-
-        }
-
-        return err!("Limit surpassed!");
-    }
-
-    fn any_elves_lost(&self) -> bool {
-        self.initial_elf_count != self.characters.values().filter(|c| c.species == Species::ELF).count()
-    }
-
-    fn elfy_outcome(&mut self) -> Option<usize> {
-        let outcome = self.outcome();
-
-        match self.any_elves_lost() {
-            true => None,
-            false => outcome.ok()
-        }
-    }
-
-    fn possible_targets(&self, c: Coordinate) -> Vec<Coordinate> {
-        let current_species: Species = self.characters.get(&c).unwrap().species;
-        self.characters
-            .keys()
-            .cloned()
-            .filter(|coord| self.characters.get(&coord).unwrap().species != current_species)
-            .collect()
-    }
-
-    fn free_squares_around(&self, target: Coordinate) -> Vec<Coordinate> {
-        target
-            .surrounding_squares()
-            .into_iter()
-            .filter(|c| self.grid.get(&c).unwrap().is_open() && !self.characters.contains_key(&c))
-            .collect()
-    }
-
-    fn adjacent_squares_to(&self, targets: &Vec<Coordinate>) -> Vec<Coordinate> {
-        targets.iter().cloned().map(|target| self.free_squares_around(target)).flatten().collect()
-    }
-
-    fn is_adjacent_to_target(&self, coord: Coordinate, targets: &Vec<Coordinate>) -> bool {
-        targets.iter().map(|c| c.surrounding_squares()).flatten().find(|&c| c == coord).is_some()
-    }
-
-    fn distances_from(&self, start: Coordinate) -> BTreeMap<Coordinate, usize> {
-        let mut d = BTreeMap::new();
-        d.insert(start, 0);
-
-        let mut queue: VecDeque<Coordinate> = VecDeque::new();
-        queue.push_front(start);
-        let mut todo_set: BTreeSet<Coordinate> = BTreeSet::new();
-        let mut visited: BTreeSet<Coordinate> = BTreeSet::new();
-        while let Some(c) = queue.pop_front() {
-            todo_set.remove(&c);
-            visited.insert(c);
-
-            for neighbour in self.free_squares_around(c) {
-                if visited.contains(&neighbour) {
-                    continue;
-                }
-                if !todo_set.contains(&neighbour) {
-                    queue.push_back(neighbour);
-                    todo_set.insert(neighbour);
-                }
-
-                let new_dist = 1 + *d.get(&c).unwrap_or(&0);
-                if !d.contains_key(&neighbour) || new_dist < d[&neighbour] {
-                    d.insert(neighbour, new_dist);
-                }
-            }
-        }
-        d
-    }
-
-    fn next_target(&self, coord: Coordinate) -> Option<Coordinate> {
-        let mut possible_targets: Vec<_> = coord
-            .surrounding_squares()
-            .into_iter()
-            .filter(|c| {
-                self.grid.get(&c).unwrap().is_open()
-                    && self.characters.contains_key(&c)
-                    && self.characters.get(&c).unwrap().species != self.characters.get(&coord).unwrap().species
-            })
-            .collect();
-
-        possible_targets.sort();
-
-        possible_targets.into_iter().min_by_key(|&c| self.characters.get(&c).unwrap().health)
-    }
-
-    fn attack(&mut self, attacker: Coordinate, target: Coordinate) {
-        let attack_power = self.characters.get(&attacker).unwrap().attack;
-
-        let succumb = self.characters.get_mut(&target).unwrap().take_damage(attack_power);
-        if succumb {
-            self.characters.remove(&target);
-        }
-    }
-
-    fn increment(&mut self) -> bool {
-        let character_coords: Vec<_> = self.characters.keys().cloned().collect();
-        let mut something_happened: bool = false;
-        for coord in character_coords.into_iter() {
-            let mut current_coord = coord;
-            if !self.characters.contains_key(&current_coord) {
-                continue;
-            }
-
-            let targets = self.possible_targets(current_coord);
-            if targets.len() == 0 {
-                return false;
-            }
-
-            let adjacent_squares = self.adjacent_squares_to(&targets);
-            if adjacent_squares.len() == 0 && !self.is_adjacent_to_target(current_coord, &targets) {
-                continue;
-            }
-
-            if !self.is_adjacent_to_target(current_coord, &targets) {
-                // it moves
-                let reachable_distances = self.distances_from(current_coord);
-
-                let mut ordered_dists: Vec<_> = adjacent_squares
-                    .iter()
-                    .filter_map(|target| reachable_distances.get(&target).map(|d| (target, d)))
-                    .collect();
-                ordered_dists.sort_by_key(|&(c, _)| c);
-
-                let chosen_coord = ordered_dists
-                    .into_iter()
-                    .min_by_key(|&(_, d)| d)
-                    .map(|(c, _)| c);
-
-                let chosen_coord = match chosen_coord {
-                    None => {
-                        continue
-                    },
-                    Some(c) => c
-                };
-
-                let dists_from_target = self.distances_from(*chosen_coord);
-                let mut ordered_dists_to_move_to: Vec<_> = self.free_squares_around(current_coord)
-                    .into_iter()
-                    .filter_map(|target| dists_from_target.get(&target).map(|d| (target, d)))
-                    .collect();
-                ordered_dists_to_move_to.sort_by_key(|&(c, _)| c);
-
-                let coord_to_move_to = ordered_dists_to_move_to
-                    .into_iter()
-                    .min_by_key(|&(_, d)| d)
-                    .map(|(c, _)| c)
-                    .unwrap();
-
-                let character = self.characters.remove(&current_coord).unwrap();
-                self.characters.insert(coord_to_move_to, character);
-
-                current_coord = coord_to_move_to;
-
-                something_happened = true;
-            }
-
-            // attack
-            let target_to_attack = match self.next_target(current_coord) {
-                None => continue,
-                Some(c) => c
-            };
-
-            self.attack(current_coord, target_to_attack);
-
-            something_happened = true;
-        }
-        something_happened
-    }
-
-    fn total_health(&self) -> usize {
-        // first, check only one species is left
-        let species_left: Vec<Species> = self.characters.values().map(|character| character.species).collect();
-        if !species_left.iter().all(|&s| species_left[0] == s) {
-            write!(io::stdout(), "{}", self).unwrap();
-            panic!("More than one species left");
-        }
-
-        println!("Total health for everyone: {:?}", self.characters.iter().map(|(k, v)| (k, v.health)).collect::<Vec<_>>());
-
-        self.characters.values().map(|character| character.health).sum()
-    }
-}
-
-impl fmt::Display for Map {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (c, cell) in &self.grid {
-            if let Some(character) = self.characters.get(&c) {
-                match character.species {
-                    Species::GOBLIN => {
-                        write!(f, "G")?;
-                    },
-                    Species::ELF => {
-                        write!(f, "E")?;
-                    }
-                }
-            } else {
-                write!(f, "{}", cell)?;
-            }
-            if c.x == self.max.x - 1 {
-                write!(f, "\n")?;
-            }
-        }
-        Ok(())
-    }
-}
-
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 enum WaterType {
     Still,
     Flowing
@@ -427,6 +113,7 @@ impl fmt::Display for WaterType {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 enum Material {
     Clay,
     Sand,
@@ -438,6 +125,34 @@ impl Material {
     fn is_water(&self) -> bool {
         match &self {
             Material::Water(_) => true,
+            _ => false
+        }
+    }
+
+    fn is_still_water(&self) -> bool {
+        match &self {
+            Material::Water(WaterType::Still) => true,
+            _ => false
+        }
+    }
+
+    fn is_flowing_water(&self) -> bool {
+        match &self {
+            Material::Water(WaterType::Flowing) => true,
+            _ => false
+        }
+    }
+
+    fn is_sand(&self) -> bool {
+        match &self {
+            Material::Sand => true,
+            _ => false
+        }
+    }
+
+    fn can_stay_on(&self) -> bool {
+        match &self {
+            Material::Clay | Material::Water(WaterType::Still) => true,
             _ => false
         }
     }
@@ -520,8 +235,8 @@ impl Underground {
         }
 
         // Account for flowing of water
-        min_coord.x -= 2;
-        max_coord.x += 2;
+        min_coord.x -= 1;
+        max_coord.x += 1;
 
         // Fill the rest of the grid in with sand
         for y in 0..max_coord.y+1 {
@@ -544,13 +259,103 @@ impl Underground {
         }
     }
 
-    fn make_water_flow(&mut self) {
-        unimplemented!();
+    fn overflow_spring(&mut self) {
+        self.material_grid.insert(Coordinate { x: 500, y: 1 }, Material::Water(WaterType::Flowing));
+    }
+
+    fn make_water_flow(&mut self) -> bool {
+        let mut change_happened: bool = false;
+
+        let flowing_water_coordinates: Vec<_> = self.material_grid.iter().filter(|(_, material)| material.is_flowing_water()).map(|(&c, _)| c).collect();
+        for flowing_water_coord in flowing_water_coordinates {
+            let coord_below = flowing_water_coord.square_below();
+
+            if coord_below > self.max_coord {
+                continue;
+            }
+
+            let material_below_flow = self.material_grid.get(&coord_below);
+
+            match material_below_flow {
+                Some(Material::Water(WaterType::Flowing)) => {
+                    continue
+                },
+                Some(Material::Sand) => {
+                    self.material_grid.insert(coord_below, Material::Water(WaterType::Flowing));
+                    change_happened = true;
+                },
+                Some(Material::Clay) | Some(Material::Water(WaterType::Still)) => {
+                    for adjacent_coord in flowing_water_coord.adjacent_squares() {
+                        if self.material_grid.get(&adjacent_coord).unwrap().is_sand() {
+                            self.material_grid.insert(adjacent_coord, Material::Water(WaterType::Flowing));
+                            change_happened = true;
+                        }
+                    }
+                },
+                _ => panic!("Cannot decipher square")
+            }
+        }
+
+        if self.settle_water() {
+            change_happened = true;
+        }
+
+        change_happened
+    }
+
+    fn can_settle(&self, coord: Coordinate, direction: Direction) -> bool {
+        let mut current_coord = coord.square_to_the(direction);
+
+        loop {
+            match self.material_grid.get(&current_coord) {
+                Some(Material::Water(_)) => {
+                    // Must be able to sit still on top of all points
+                    match self.material_grid.get(&current_coord.square_below()) {
+                        Some(Material::Clay) | Some(Material::Water(WaterType::Still)) => {},
+                        _ => { return false; },
+                    }
+                    current_coord = current_coord.square_to_the(direction);
+                },
+                Some(Material::Sand) | None => {
+                    return false;
+                },
+                Some(Material::Clay) => {
+                    return true;
+                },
+                square => panic!("Cannot decipher square when going {:?} from {}; found {:?}", direction, coord, square)
+            }
+        }
+    }
+
+    fn settle_water(&mut self) -> bool {
+        let mut something_changed: bool = false;
+        let flowing_water_coordinates: Vec<_> = self.material_grid.iter().filter(|(_, material)| material.is_flowing_water()).map(|(&c, _)| c).collect();
+
+        for flowing_water_coord in flowing_water_coordinates {
+            if let Some(material) = self.material_grid.get(&flowing_water_coord.square_below()) {
+                if !material.can_stay_on() {
+                    continue;
+                }
+            }
+
+            if self.can_settle(flowing_water_coord, Direction::Left) && self.can_settle(flowing_water_coord, Direction::Right) {
+                self.material_grid.insert(flowing_water_coord, Material::Water(WaterType::Still));
+                something_changed = true;
+            }
+        }
+
+        something_changed
     }
 
     fn total_water_count(&self) -> usize {
         self.material_grid.iter()
             .filter(|(&c, material)| material.is_water() && self.min_coord <= c && self.max_coord >= c)
+            .count()
+    }
+
+    fn total_still_water_count(&self) -> usize {
+        self.material_grid.iter()
+            .filter(|(&c, material)| material.is_still_water() && self.min_coord <= c && self.max_coord >= c)
             .count()
     }
 }
@@ -580,12 +385,20 @@ pub fn q1(fname: String) -> usize {
 }
 
 fn _q1(sand_locations: Vec<String>) -> Result<usize> {
-    let underground = Underground::new(sand_locations);
+    let mut underground = Underground::new(sand_locations);
+
+    underground.overflow_spring();
+
+    loop {
+        let change_happened = underground.make_water_flow();
+        if !change_happened {
+            break;
+        }
+    }
 
     print!("{}", underground);
 
-    // unimplemented!();
-    Ok(0)
+    Ok(underground.total_water_count())
 }
 
 pub fn q2(fname: String) -> usize {
@@ -593,24 +406,28 @@ pub fn q2(fname: String) -> usize {
     let mut f_contents = String::new();
 
     f.read_to_string(&mut f_contents).expect("Couldn't find file");
-    let map: Vec<Vec<char>> = f_contents.lines().map(|x: &str| {
-        x.to_string().chars().collect::<Vec<char>>()
+    let sand_locations: Vec<String> = f_contents.lines().map(|x: &str| {
+        x.trim().to_string()
     }).collect();
 
-    _q2(map).unwrap()
+    _q2(sand_locations).unwrap()
 }
 
-fn _q2(input_grid: Vec<Vec<char>>) -> Result<usize> {
-    for elf_atk in 4..100 {
-        match Map::new_w_atk(input_grid.clone(), elf_atk).unwrap().elfy_outcome() {
-            Some(outcome) => {
-               return Ok(outcome)
-            },
-            None => continue
+fn _q2(sand_locations: Vec<String>) -> Result<usize> {
+    let mut underground = Underground::new(sand_locations);
+
+    underground.overflow_spring();
+
+    loop {
+        let change_happened = underground.make_water_flow();
+        if !change_happened {
+            break;
         }
     }
 
-    return err!("Limit surpassed!");
+    print!("{}", underground);
+
+    Ok(underground.total_still_water_count())
 }
 
 #[cfg(test)]
@@ -631,6 +448,23 @@ mod tests {
                 "y=13, x=498..504".to_string(),
             ]).unwrap(),
             57
+        );
+    }
+
+    #[test]
+    fn q2_test() {
+        assert_eq!(
+            _q2(vec![
+                "x=495, y=2..7".to_string(),
+                "y=7, x=495..501".to_string(),
+                "x=501, y=3..7".to_string(),
+                "x=498, y=2..4".to_string(),
+                "x=506, y=1..2".to_string(),
+                "x=498, y=10..13".to_string(),
+                "x=504, y=10..13".to_string(),
+                "y=13, x=498..504".to_string(),
+            ]).unwrap(),
+            29
         );
     }
 }
