@@ -434,6 +434,15 @@ enum Material {
     Water(WaterType)
 }
 
+impl Material {
+    fn is_water(&self) -> bool {
+        match &self {
+            Material::Water(_) => true,
+            _ => false
+        }
+    }
+}
+
 impl fmt::Display for Material {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -533,6 +542,16 @@ impl Underground {
             min_coord,
             max_coord
         }
+    }
+
+    fn make_water_flow(&mut self) {
+        unimplemented!();
+    }
+
+    fn total_water_count(&self) -> usize {
+        self.material_grid.iter()
+            .filter(|(&c, material)| material.is_water() && self.min_coord <= c && self.max_coord >= c)
+            .count()
     }
 }
 
