@@ -9,6 +9,10 @@ use std::usize;
 
 use std::collections::BTreeMap;
 
+macro_rules! err {
+    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
+}
+
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
 fn pause() {
@@ -30,6 +34,10 @@ struct Coordinate {
 }
 
 impl Coordinate {
+    fn new(x: i32, y: i32) -> Coordinate {
+        Coordinate { x, y }
+    }
+
     fn surrounding_squares(self: Coordinate) -> Vec<Coordinate> {
         vec![
             Coordinate { x: self.x - 1, y: self.y - 1 },
@@ -82,144 +90,42 @@ enum Acre {
     Lumberyard,
 }
 
-impl Acre {
-    fn new(acre_symbol: char) -> Acre {
-        match acre_symbol {
-            '.' => Acre::Open,
-            '|' => Acre::Trees,
-            '#' => Acre::Lumberyard,
-            _ => panic!()
-        }
-    }
-
-    fn is_open(&self) -> bool {
-        match self {
-            Acre::Open => true,
-            _ => false
-        }
-    }
-
-    fn is_trees(&self) -> bool {
-        match self {
-            Acre::Trees => true,
-            _ => false
-        }
-    }
-    fn is_lumberyard(&self) -> bool {
-        match self {
-            Acre::Lumberyard => true,
-            _ => false
-        }
-    }
-}
-
-impl fmt::Display for Acre {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Acre::Open => write!(f, "."),
-            Acre::Trees => write!(f, "|"),
-            Acre::Lumberyard => write!(f, "#"),
-        }
-    }
-}
-
-fn new_acre_at(current_acre: Acre, surrounding_acres: Vec<Acre>) -> Acre {
-    match current_acre {
-        Acre::Open => {
-            // Becomes trees if surrounded by at least 3 acres of trees
-            match surrounding_acres.iter().filter(|acre| acre.is_trees()).count() {
-                3..=8 => Acre::Trees,
-                _ => Acre::Open
-            }
-        },
-        Acre::Trees => {
-            // Becomes trees if surrounded by at least 3 acres of trees
-            match surrounding_acres.iter().filter(|acre| acre.is_lumberyard()).count() {
-                3..=8 => Acre::Lumberyard,
-                _ => Acre::Trees
-            }
-        },
-        Acre::Lumberyard => {
-            match (
-                surrounding_acres.iter().filter(|acre| acre.is_lumberyard()).count(),
-                surrounding_acres.iter().filter(|acre| acre.is_trees()).count()
-            ) {
-                (x, y) if x >= 1 && y >= 1 => Acre::Lumberyard,
-                _ => Acre::Open
-            }
-        },
-    }
-}
-
-struct Grove {
-    acre_grid: BTreeMap<Coordinate, Acre>,
-    max_coord: Coordinate
-}
-
-impl Grove {
-    fn new(grove_rows: Vec<String>) -> Grove {
-        let max_coord = Coordinate { x: grove_rows[0].len() as i32 - 1, y: grove_rows.len() as i32 - 1 };
-        let mut acre_grid: BTreeMap<Coordinate, Acre> = BTreeMap::new();
-
-        for y in 0..max_coord.y+1 {
-            let grove_row: Vec<char> = grove_rows[y as usize].chars().collect();
-            for x in 0..max_coord.x+1 {
-                acre_grid.insert(Coordinate{x, y}, Acre::new(grove_row[x as usize]));
-            }
-        }
-
-        Grove {
-            acre_grid,
-            max_coord
-        }
-    }
-
-    fn increment_minute(&mut self) {
-        let mut new_acre: BTreeMap<Coordinate, Acre> = BTreeMap::new();
-
-        for (&c, &acre) in &self.acre_grid {
-            new_acre.insert(
-                c,
-                new_acre_at(
-                    acre,
-                    c.surrounding_squares()
-                        .into_iter()
-                        .filter_map(|square| self.acre_grid.get(&square))
-                        .map(|acre| acre.clone())
-                        .collect()
-                )
-            );
-        }
-
-        self.acre_grid = new_acre;
-    }
-
-    fn resource_value(&self) -> usize {
-        self.acre_grid.values().filter(|acre| acre.is_trees()).count()
-            * self.acre_grid.values().filter(|acre| acre.is_lumberyard()).count()
-    }
-}
-
-impl fmt::Display for Grove {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (c, acre) in &self.acre_grid {
-            write!(f, "{}", acre)?;
-            if c.x == self.max_coord.x {
-                write!(f, "\n")?;
-            }
-        }
-        Ok(())
-    }
-}
-
 struct RoomPlan {
-    room_links: BTreeMap<Coordinate, Vec<Coordinate>>
+    room_links: BTreeMap<Coordinate, Vec<Coordinate>>,
+    path_regex: Vec<char>
 }
 
 impl RoomPlan {
     fn new(path_regex: String) -> Result<RoomPlan> {
         // (0, 0) is marked as a starting room
-        unimplemented!();
+        if !(path_regex.starts_with("^") && path_regex.ends_with("$")) {
+            return err!("Input regex does not start with ^ and end with $");
+        }
+
+        Ok(
+            RoomPlan {
+                room_links: BTreeMap::new(),
+                path_regex: path_regex.chars().collect()
+            }
+        )
+    }
+
+    fn _parse_regex(&mut self, coord: Coordinate, start: usize, end: usize) -> Result<Coordinate> {
+        let current_coord = coord;
+
+        let current_char_scope = &self.path_regex[start..end];
+
+        Ok(current_coord)
+    }
+
+    fn parse_regex(&mut self) -> Result<()> {
+        let (start, end) = (1, self.path_regex.len()-1);
+
+        let starting_coord = Coordinate::new(0, 0);
+
+        self._parse_regex(starting_coord, start, end)?;
+
+        Ok(())
     }
 
     fn path_length_to_furthest_room(&self) -> usize {
@@ -238,6 +144,7 @@ pub fn q1(fname: String) -> usize {
 
 fn _q1(path_regex: String) -> Result<usize> {
     let mut room_plan = RoomPlan::new(path_regex)?;
+    room_plan.parse_regex()?;
     Ok(room_plan.path_length_to_furthest_room())
 }
 
