@@ -174,6 +174,8 @@ impl RoomPlan {
                         .map(|cs: &[char]| self._parse_regex(current_coord, cs))
                         .collect();
 
+
+                    #[allow(unused_variables)]
                     let finished_coords = finished_coords?;
 
                     current_chars = &current_chars[end_idx+1..];

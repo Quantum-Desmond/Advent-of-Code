@@ -1,17 +1,10 @@
-use std::cmp;
 use std::error::Error;
-use std::fmt;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::result;
-use std::str::FromStr;
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
-
-macro_rules! err {
-    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
-}
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 

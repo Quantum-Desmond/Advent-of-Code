@@ -5,19 +5,14 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::result;
-use std::str::FromStr;
 use std::usize;
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::BTreeMap;
 
 use itertools::Itertools;
 use itertools::MinMaxResult::MinMax;
 
 use regex::Regex;
-
-macro_rules! err {
-    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
-}
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
