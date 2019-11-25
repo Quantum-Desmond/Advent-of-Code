@@ -60,3 +60,6 @@ pub mod day_20;
 
 #[allow(dead_code)]
 pub mod day_21;
+
+#[allow(dead_code)]
+pub mod day_22;
