@@ -45,7 +45,7 @@ impl Coordinate {
         Coordinate { x, y, z }
     }
 
-    fn surrounding_squares(self) -> Vec<Coordinate> {
+    fn surrounding_squares(self, multiplier: i32) -> Vec<Coordinate> {
         let ds_list: Vec<_> = iter::repeat(-1..2).take(3).multi_cartesian_product().collect();
         ds_list.into_iter()
             // .filter(|ds| ds[0] != 0 || ds[1] != 0 || ds[2] != 0)
@@ -53,7 +53,7 @@ impl Coordinate {
                 let dx = ds[0];
                 let dy = ds[1];
                 let dz = ds[2];
-                Coordinate { x: self.x + dx, y: self.y + dy, z: self.z + dz }
+                Coordinate { x: self.x + (multiplier * dx), y: self.y + (multiplier * dy), z: self.z + (multiplier * dz) }
             }).collect()
     }
 
@@ -234,6 +234,8 @@ fn _q2(nanobot_list: String) -> Result<usize> {
 
     let nanobots = nanobots?;
 
+    // Try searching all of the points on the borders of the radii
+
     let best_nanobot = nanobots.iter().max_by_key(|nanobot| nanobot.radius).ok_or("No nanobots!")?;
 
     let mut current_position: Coordinate = best_nanobot.pos;
@@ -281,16 +283,17 @@ fn _q2(nanobot_list: String) -> Result<usize> {
     println!("Got to first part");
     println!("Current position = {}", current_position);
 
+    let mut count = 0;
     loop {
         let max_nanobots_in_range: usize = current_position
-            .surrounding_squares()
+            .surrounding_squares(1)
             .into_iter()
             .map(|coord| nanobots_in_range_of(&nanobots, coord))
             .max()
             .ok_or("No coordinates surrounding position")?;
 
         let mut coords_to_go_to: Vec<Coordinate> = current_position
-            .surrounding_squares()
+            .surrounding_squares(10)
             .into_iter()
             .filter(|&c| nanobots_in_range_of(&nanobots, c) == max_nanobots_in_range)
             .collect();
@@ -303,12 +306,78 @@ fn _q2(nanobot_list: String) -> Result<usize> {
 
         current_position = coord_to_go_to;
 
-        println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+        // println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+        if count % 10_000 == 0 {
+            println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+            count = 0;
+        }
+
+        count += 1;
+    }
+
+    loop {
+        let max_nanobots_in_range: usize = current_position
+            .surrounding_squares(1)
+            .into_iter()
+            .map(|coord| nanobots_in_range_of(&nanobots, coord))
+            .max()
+            .ok_or("No coordinates surrounding position")?;
+
+        let mut coords_to_go_to: Vec<Coordinate> = current_position
+            .surrounding_squares(5)
+            .into_iter()
+            .filter(|&c| nanobots_in_range_of(&nanobots, c) == max_nanobots_in_range)
+            .collect();
+        coords_to_go_to.sort_by_key(|c| c.distance_from(Coordinate::new(0, 0, 0)));
+
+        let coord_to_go_to: Coordinate = *coords_to_go_to.get(0).ok_or("No coordinates!")?;
+        if coord_to_go_to == current_position {
+            break;
+        }
+
+        current_position = coord_to_go_to;
+
+        // println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+        if count % 10_000 == 0 {
+            println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+            count = 0;
+        }
+
+        count += 1;
+    }
+
+    loop {
+        let max_nanobots_in_range: usize = current_position
+            .surrounding_squares(1)
+            .into_iter()
+            .map(|coord| nanobots_in_range_of(&nanobots, coord))
+            .max()
+            .ok_or("No coordinates surrounding position")?;
+
+        let mut coords_to_go_to: Vec<Coordinate> = current_position
+            .surrounding_squares(1)
+            .into_iter()
+            .filter(|&c| nanobots_in_range_of(&nanobots, c) == max_nanobots_in_range)
+            .collect();
+        coords_to_go_to.sort_by_key(|c| c.distance_from(Coordinate::new(0, 0, 0)));
+
+        let coord_to_go_to: Coordinate = *coords_to_go_to.get(0).ok_or("No coordinates!")?;
+        if coord_to_go_to == current_position {
+            break;
+        }
+
+        current_position = coord_to_go_to;
+
+        // println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+        if count % 10_000 == 0 {
+            println!("Current position is now {} with nanobots {}", current_position, max_nanobots_in_range);
+            count = 0;
+        }
+
+        count += 1;
     }
 
     println!("Position chosen = {}", current_position);
-    println!("{}", nanobots_in_range_of(&nanobots, Coordinate::new(11, 12, 12)));
-    println!("{}", nanobots_in_range_of(&nanobots, Coordinate::new(12, 12, 12)));
 
     Ok(
         current_position.distance_from(Coordinate::new(0, 0, 0))
